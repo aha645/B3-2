@@ -1,5 +1,7 @@
 # 로컬 실행 환경 및 API 옵션 검토
 
+> **이 문서 아래의 Ollama 구성은 과거 검증 기록입니다.** 사용자 요청으로 Ollama 서버를 종료하고 `~/.local/bin/ollama`, `~/.local/share/ollama`, `~/.ollama`(모델·캐시·Ollama 키 포함)를 제거했습니다. 현재는 소스 빌드한 llama-server와 Hugging Face GGUF 모델을 사용합니다. 새 환경 준비·인증·실행 방법은 README, 최신 테스트 결과는 `doc/verification.md`를 참고하세요.
+
 ## 현재 구성
 
 - Python 요구 버전: 3.10 이상. 개발 인터프리터: uv 관리 Python 3.11.18.

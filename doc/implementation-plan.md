@@ -1,6 +1,6 @@
 # AI 기반 Git 커밋·PR 초안 생성기 구현 계획
 
-> **환경 구성 후 변경 사항:** 최신 로컬 실행 결정과 옵션 검토는 `doc/local-environment.md`를 따른다. Python 3.11 가상환경과 Ollama `qwen2.5-coder:7b`를 사용한다. 로컬 Ollama는 API Key가 필요하지 않으며 인증 API의 키가 필요한 경우 환경변수로만 관리한다. Git 수집은 `git status`·`git diff`로 제한하고 루트 확인에 추가 Git 명령을 사용하지 않는다. 아래 외부 제공자·필수 키 관련 내용은 초기 계획이며 이 결정으로 대체한다.
+> **최신 구현 결정:** README와 `doc/verification.md`를 따른다. Python 3.11 가상환경, 소스 빌드한 llama-server와 Hugging Face Qwen2.5-Coder-7B-Instruct GGUF를 사용한다. 기존 Ollama 환경은 제거했다. `AI_API_KEY` 환경변수를 실제 로컬 서버 인증에 사용하며 키를 인자·파일·로그에 넣지 않는다. Git 수집은 status/diff만 사용한다. 아래 제공자·REST 형식·환경 구성 관련 내용은 초기 계획이며 최신 구현과 다른 부분은 README로 대체한다.
 
 ## 1. 목표와 범위
 

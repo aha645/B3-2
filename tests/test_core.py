@@ -1,4 +1,5 @@
 import json
+from contextlib import nullcontext
 from pathlib import Path
 import subprocess
 
@@ -7,9 +8,16 @@ import pytest
 
 import ai_client
 import main
+import inference_server
 from git_context import collect, parse_status
 from safety import check_size, mask, prepare
 from validation import render, validate
+
+
+@pytest.fixture(autouse=True)
+def local_environment(monkeypatch):
+    monkeypatch.setenv('AI_API_KEY', 'test-only-not-a-real-secret')
+    monkeypatch.setattr(inference_server, 'local_server', lambda *args, **kwargs: nullcontext())
 
 
 def git(root, *args):
@@ -138,12 +146,14 @@ def test_api_success():
     calls = []
     def handler(request):
         calls.append(json.loads(request.content))
-        return httpx.Response(200, json={'done': True, 'response': '{}'})
+        assert request.headers['Authorization'] == 'Bearer test-only-not-a-real-secret'
+        return httpx.Response(200, json={'choices': [{'finish_reason': 'stop', 'message': {'content': '{}'}}]})
     with request_client(handler) as client:
         assert ai_client.generate('system', 'prompt', 'model', 0.3, 100, client=client) == '{}'
     assert len(calls) == 1
-    assert calls[0]['options']['num_predict'] == 100
-    assert calls[0]['options']['temperature'] == 0.3
+    assert calls[0]['max_tokens'] == 100
+    assert calls[0]['temperature'] == 0.3
+    assert calls[0]['response_format'] == {'type': 'json_object'}
 
 
 @pytest.mark.parametrize('status', [401, 403, 404, 429, 500])
@@ -154,7 +164,7 @@ def test_http_errors(status):
         assert 'secret' not in str(error.value)
 
 
-@pytest.mark.parametrize('kind', ['timeout', 'connection', 'badjson', 'missing', 'length', 'context'])
+@pytest.mark.parametrize('kind', ['timeout', 'connection', 'badjson', 'missing', 'length', 'empty'])
 def test_api_failures(kind):
     def handler(request):
         if kind == 'timeout':
@@ -163,13 +173,13 @@ def test_api_failures(kind):
             raise httpx.ConnectError('secret', request=request)
         if kind == 'badjson':
             return httpx.Response(200, text='invalid')
-        data = {'done': True, 'response': '{}'}
+        data = {'choices': [{'finish_reason': 'stop', 'message': {'content': '{}'}}]}
         if kind == 'missing':
-            data.pop('response')
+            data['choices'] = []
         if kind == 'length':
-            data['done_reason'] = 'length'
-        if kind == 'context':
-            data['prompt_eval_count'] = 8190
+            data['choices'][0]['finish_reason'] = 'length'
+        if kind == 'empty':
+            data['choices'][0]['message']['content'] = ''
         return httpx.Response(200, json=data)
     with request_client(handler) as client:
         with pytest.raises(ValueError):
@@ -194,6 +204,7 @@ def test_cli_success(repo, monkeypatch, capsys, mode):
 
 def test_cli_no_changes(repo, monkeypatch, capsys):
     monkeypatch.chdir(repo)
+    monkeypatch.delenv('AI_API_KEY')
     monkeypatch.setattr(ai_client, 'generate', lambda *a: pytest.fail('unexpected API'))
     assert main.main(['commit']) == 0
     output = capsys.readouterr()
@@ -232,6 +243,16 @@ def test_cli_api_error(repo, monkeypatch, capsys):
     assert main.main(['commit']) == 1
     output = capsys.readouterr()
     assert not output.out and 'AI 연결 실패' in output.err and '요청 횟수: 1' in output.err
+
+
+def test_cli_missing_key(repo, monkeypatch, capsys):
+    monkeypatch.chdir(repo)
+    monkeypatch.delenv('AI_API_KEY')
+    monkeypatch.setattr(inference_server, 'local_server', lambda *a, **kw: inference_server.api_key())
+    (repo / 'sample.py').write_text('changed')
+    assert main.main(['commit']) == 1
+    output = capsys.readouterr()
+    assert 'AI_API_KEY' in output.err and '요청 횟수: 0' in output.err
 
 
 def test_cli_bad_response(repo, monkeypatch, capsys):

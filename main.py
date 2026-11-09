@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 import ai_client
+import inference_server
 from git_context import collect
 from prompts import build
 from safety import check_size, prepare
@@ -22,7 +23,10 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest='command', required=True)
     for name in ('commit', 'pr'):
         command = commands.add_parser(name)
-        command.add_argument('--model', '-model', default='qwen2.5-coder:7b')
+        command.add_argument('--model', '-model', default=inference_server.MODEL_NAME)
+        command.add_argument('--model-path', type=Path, default=inference_server.MODEL_PATH)
+        command.add_argument('--server-path', type=Path, default=None)
+        command.add_argument('--server-mode', choices=['auto', 'existing'], default='auto')
         command.add_argument('--temperature', '-temperature', type=float, default=0.2)
         command.add_argument('--max-tokens', '-max-tokens', type=int, default=1000)
         command.add_argument('--reason', default='')
@@ -57,8 +61,10 @@ def main(argv=None) -> int:
         check_size(system + prompt)
         ai_client.check_input(system, prompt, args.max_tokens)
         print(f'[INFO] 안전 모드: {"ON" if args.safe else "OFF"}, 마스킹: {count}건', file=sys.stderr)
-        calls += 1
-        text = ai_client.generate(system, prompt, args.model, args.temperature, args.max_tokens)
+        with inference_server.local_server(args.model, args.model_path, args.server_path,
+                                           existing_only=args.server_mode == 'existing'):
+            calls += 1
+            text = ai_client.generate(system, prompt, args.model, args.temperature, args.max_tokens)
         result, warnings = validate(text, args.command)
         for warning in warnings:
             print('[WARN] ' + warning, file=sys.stderr)

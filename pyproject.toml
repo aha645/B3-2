@@ -3,10 +3,16 @@ name = "ai-gitgen"
 version = "0.1.0"
 description = "Git 변경 기반 한국어 커밋 및 PR 초안 생성 CLI"
 requires-python = ">=3.10"
-dependencies = ["httpx>=0.28,<0.29"]
+dependencies = [
+    "httpx>=0.28,<0.29",
+    "huggingface-hub>=0.30,<2",
+]
 
 [dependency-groups]
-dev = ["pytest>=8,<9"]
+dev = [
+    "cmake>=3.28,<5",
+    "pytest>=8,<9",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
